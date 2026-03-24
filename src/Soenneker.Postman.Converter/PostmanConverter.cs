@@ -45,6 +45,8 @@ public sealed class PostmanConverter : IPostmanConverter
         if (rootNode is not JsonObject root)
             throw new InvalidOperationException("Postman collection JSON root must be an object.");
 
+        root = NormalizeCollectionRoot(root);
+
         JsonObject info = root["info"] as JsonObject ?? throw new InvalidOperationException("Postman collection is missing the 'info' object.");
         JsonArray items = root["item"] as JsonArray ?? throw new InvalidOperationException("Postman collection is missing the 'item' array.");
 
@@ -169,6 +171,14 @@ public sealed class PostmanConverter : IPostmanConverter
 
         await File.WriteAllTextAsync(openApiFilePath, json, cancellationToken)
                   .ConfigureAwait(false);
+    }
+
+    private static JsonObject NormalizeCollectionRoot(JsonObject root)
+    {
+        if (root["collection"] is JsonObject wrappedCollection)
+            return wrappedCollection;
+
+        return root;
     }
 
     private void ProcessItem(JsonObject item, OpenApiDocument document, IReadOnlyDictionary<string, PostmanVariable> variables, List<string> parentFolders,
