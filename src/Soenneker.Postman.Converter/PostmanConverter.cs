@@ -514,7 +514,7 @@ public sealed class PostmanConverter : IPostmanConverter
                         if (string.IsNullOrWhiteSpace(key))
                             continue;
 
-                        schema.Properties[key] = InferScalarSchema(GetString(entry, "value"));
+                        schema.Properties[NormalizeSchemaPropertyName(key)] = InferScalarSchema(GetString(entry, "value"));
                     }
                 }
 
@@ -836,12 +836,13 @@ public sealed class PostmanConverter : IPostmanConverter
 
         foreach ((string key, JsonNode? value) in obj)
         {
-            schema.Properties[key] = value == null ? new OpenApiSchema { Type = JsonSchemaType.String } : InferSchema(value);
+            string normalizedKey = NormalizeSchemaPropertyName(key);
+            schema.Properties[normalizedKey] = value == null ? new OpenApiSchema { Type = JsonSchemaType.String } : InferSchema(value);
 
             if (value != null)
             {
                 schema.Required ??= new HashSet<string>();
-                schema.Required.Add(key);
+                schema.Required.Add(normalizedKey);
             }
         }
 
@@ -914,6 +915,15 @@ public sealed class PostmanConverter : IPostmanConverter
             return null;
 
         return node.GetValueKind() == JsonValueKind.Null ? null : node.ToString();
+    }
+
+    private static string NormalizeSchemaPropertyName(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return key;
+
+        string normalized = key.Trim().TrimEnd('\\', '"');
+        return string.IsNullOrWhiteSpace(normalized) ? key : normalized;
     }
 
     private sealed record PostmanVariable(string? Value, string? Description);
