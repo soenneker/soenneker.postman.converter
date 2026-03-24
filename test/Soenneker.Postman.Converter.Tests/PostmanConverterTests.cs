@@ -20,6 +20,11 @@ public sealed class PostmanConverterTests : FixturedUnitTest
         _util = Resolve<IPostmanConverter>(true);
     }
 
+    [Fact]
+    public void Default()
+    {
+    }
+
     [ManualFact]
     public async Task ConvertFile_should_convert_fastly_collection()
     {
