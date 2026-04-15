@@ -44,6 +44,6 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.OpenApi" Version="3.5.2" />
-        <PackageReference Include="Soenneker.Utils.HttpClientCache" Version="4.0.1927" />
+        <PackageReference Include="Soenneker.Utils.HttpClientCache" Version="4.0.1929" />
     </ItemGroup>
 </Project>
