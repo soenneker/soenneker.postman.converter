@@ -4,7 +4,6 @@ using System.Net.Http;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.OpenApi;
-using Soenneker.Facts.Manual;
 
 namespace Soenneker.Postman.Converter.Tests;
 
@@ -24,7 +23,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
     {
     }
 
-    [ManualFact]
+    [Skip("Manual")]
     public async Task ConvertFile_should_convert_fastly_collection()
     {
         Assert.True(File.Exists(_fastlyPostmanPath), $"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
@@ -48,7 +47,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
         Assert.Contains("200", operation.Responses.Keys);
     }
 
-    [ManualFact]
+    [Skip("Manual")]
     public async Task SaveOpenApiFile_should_write_openapi_json_for_fastly_collection()
     {
         Assert.True(File.Exists(_fastlyPostmanPath), $"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
