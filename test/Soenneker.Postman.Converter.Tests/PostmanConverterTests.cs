@@ -1,26 +1,25 @@
 using Soenneker.Postman.Converter.Abstract;
-using Soenneker.Tests.FixturedUnit;
+using Soenneker.Tests.HostedUnit;
 using System.Net.Http;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.OpenApi;
 using Soenneker.Facts.Manual;
-using Xunit;
 
 namespace Soenneker.Postman.Converter.Tests;
 
-[Collection("Collection")]
-public sealed class PostmanConverterTests : FixturedUnitTest
+[ClassDataSource<Host>(Shared = SharedType.PerTestSession)]
+public sealed class PostmanConverterTests : HostedUnitTest
 {
     private const string _fastlyPostmanPath = @"C:\cloudflare\fastly postman.json";
     private readonly IPostmanConverter _util;
 
-    public PostmanConverterTests(Fixture fixture, ITestOutputHelper output) : base(fixture, output)
+    public PostmanConverterTests(Host host) : base(host)
     {
         _util = Resolve<IPostmanConverter>(true);
     }
 
-    [Fact]
+    [Test]
     public void Default()
     {
     }
