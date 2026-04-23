@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.OpenApi;
+using AwesomeAssertions;
 
 namespace Soenneker.Postman.Converter.Tests;
 
@@ -24,47 +25,49 @@ public sealed class PostmanConverterTests : HostedUnitTest
     }
 
     [Skip("Manual")]
+    [Test]
     public async Task ConvertFile_should_convert_fastly_collection()
     {
-        Assert.True(File.Exists(_fastlyPostmanPath), $"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
+        File.Exists(_fastlyPostmanPath).Should().BeTrue($"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
 
-        OpenApiDocument result = await _util.ConvertFile(_fastlyPostmanPath, TestContext.Current.CancellationToken);
+        OpenApiDocument result = await _util.ConvertFile(_fastlyPostmanPath, System.Threading.CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.NotNull(result.Info);
-        Assert.Equal("Fastly API", result.Info.Title);
+        result.Info.Title.Should().Be("Fastly API");
         Assert.NotNull(result.Paths);
-        Assert.NotEmpty(result.Paths);
-        Assert.True(result.Paths.TryGetValue("/customer/{customer_id}/billing_address", out IOpenApiPathItem? pathItem));
+        result.Paths.Should().NotBeEmpty();
+        result.Paths.TryGetValue("/customer/{customer_id}/billing_address", out IOpenApiPathItem? pathItem).Should().BeTrue();
         Assert.NotNull(pathItem);
         Assert.NotNull(result.Servers);
-        Assert.Contains(result.Servers, server => server.Url == "https://api.fastly.com");
+        result.Servers.Should().Contain(server => server.Url == "https://api.fastly.com");
         Assert.NotNull(pathItem!.Operations);
-        Assert.True(pathItem.Operations.TryGetValue(HttpMethod.Get, out OpenApiOperation? operation));
+        pathItem.Operations.TryGetValue(HttpMethod.Get, out OpenApiOperation? operation).Should().BeTrue();
         Assert.NotNull(operation);
-        Assert.Equal("Get a billing address", operation!.Summary);
+        operation!.Summary.Should().Be("Get a billing address");
         Assert.NotNull(operation.Responses);
-        Assert.Contains("200", operation.Responses.Keys);
+        operation.Responses.Keys.Should().Contain("200");
     }
 
     [Skip("Manual")]
+    [Test]
     public async Task SaveOpenApiFile_should_write_openapi_json_for_fastly_collection()
     {
-        Assert.True(File.Exists(_fastlyPostmanPath), $"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
+        File.Exists(_fastlyPostmanPath).Should().BeTrue($"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
 
         string outputPath = Path.Combine(Path.GetTempPath(), $"fastly-openapi-{Path.GetRandomFileName()}.json");
 
         try
         {
-            await _util.SaveOpenApiFile(_fastlyPostmanPath, outputPath, TestContext.Current.CancellationToken);
+            await _util.SaveOpenApiFile(_fastlyPostmanPath, outputPath, System.Threading.CancellationToken.None);
 
-            Assert.True(File.Exists(outputPath));
+            File.Exists(outputPath).Should().BeTrue();
 
-            string json = await File.ReadAllTextAsync(outputPath, TestContext.Current.CancellationToken);
+            string json = await File.ReadAllTextAsync(outputPath, System.Threading.CancellationToken.None);
 
-            Assert.Contains("\"openapi\"", json);
-            Assert.Contains("\"Fastly API\"", json);
-            Assert.Contains("\"/customer/{customer_id}/billing_address\"", json);
+            json.Should().Contain("\"openapi\"");
+            json.Should().Contain("\"Fastly API\"");
+            json.Should().Contain("\"/customer/{customer_id}/billing_address\"");
         }
         finally
         {
@@ -73,3 +76,4 @@ public sealed class PostmanConverterTests : HostedUnitTest
         }
     }
 }
+
