@@ -6,12 +6,12 @@ using Soenneker.Utils.HttpClientCache.Registrar;
 namespace Soenneker.Postman.Converter.Registrars;
 
 /// <summary>
-/// A utility library that converts Postman schemas to OpenApi
+/// Registers the Postman-to-OpenAPI converter and its HTTP dependency.
 /// </summary>
 public static class PostmanConverterRegistrar
 {
     /// <summary>
-    /// Adds <see cref="IPostmanConverter"/> as a singleton service. <para/>
+    /// Adds <see cref="IPostmanConverter"/> as a singleton service.
     /// </summary>
     /// <param name="services">Service collection that receives the registration.</param>
     /// <returns>The same service collection, so additional registrations can be chained.</returns>
@@ -24,7 +24,7 @@ public static class PostmanConverterRegistrar
     }
 
     /// <summary>
-    /// Adds <see cref="IPostmanConverter"/> as a scoped service. <para/>
+    /// Adds <see cref="IPostmanConverter"/> as a scoped service while retaining the singleton HTTP transport.
     /// </summary>
     /// <param name="services">Service collection that receives the registration.</param>
     /// <returns>The same service collection, so additional registrations can be chained.</returns>

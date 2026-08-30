@@ -1,50 +1,72 @@
 [![](https://img.shields.io/nuget/v/soenneker.postman.converter.svg?style=for-the-badge)](https://www.nuget.org/packages/soenneker.postman.converter/)
+[![](https://img.shields.io/github/actions/workflow/status/soenneker/soenneker.postman.converter/build-and-test.yml?style=for-the-badge)](https://github.com/soenneker/soenneker.postman.converter/actions/workflows/build-and-test.yml)
 [![](https://img.shields.io/github/actions/workflow/status/soenneker/soenneker.postman.converter/publish-package.yml?style=for-the-badge)](https://github.com/soenneker/soenneker.postman.converter/actions/workflows/publish-package.yml)
 [![](https://img.shields.io/nuget/dt/soenneker.postman.converter.svg?style=for-the-badge)](https://www.nuget.org/packages/soenneker.postman.converter/)
+[![](https://img.shields.io/github/actions/workflow/status/soenneker/soenneker.postman.converter/codeql.yml?label=CodeQL&style=for-the-badge)](https://github.com/soenneker/soenneker.postman.converter/actions/workflows/codeql.yml)
 
 # Soenneker.Postman.Converter
 
-A utility library that converts Postman schemas to OpenApi.
+Converts Postman collection JSON into an OpenAPI v3 document or JSON file.
 
-## Install
+## Installation
 
 ```bash
 dotnet add package Soenneker.Postman.Converter
 ```
 
-## Quick start
+## Registration
 
 ```csharp
 using Soenneker.Postman.Converter.Registrars;
-using Microsoft.Extensions.DependencyInjection;
 
-var services = new ServiceCollection();
-var result = services.AddPostmanConverterAsSingleton();
+services.AddPostmanConverterAsSingleton();
 ```
 
-Adds `IPostmanConverter` as a singleton service.
+The converter is safe to reuse concurrently. A scoped registration is also available; its HTTP transport remains process-wide.
 
-## What you get
+## Convert JSON or a file
 
-- `IPostmanConverter` — A utility library that converts Postman schemas to OpenApi.
-- `PostmanConverterRegistrar` — A utility library that converts Postman schemas to OpenApi.
+```csharp
+using Microsoft.OpenApi;
+using Soenneker.Postman.Converter.Abstract;
 
-## API at a glance
+IPostmanConverter converter =
+    serviceProvider.GetRequiredService<IPostmanConverter>();
 
-| API | What it does | Result / important behavior |
-| --- | --- | --- |
-| `IPostmanConverter.Convert(postmanJson, cancellationToken)` | Converts a Postman collection JSON payload into an OpenAPI document. | A task whose result is the requested openAPI Document. |
-| `IPostmanConverter.ConvertToJson(postmanJson, cancellationToken)` | Converts a Postman collection JSON payload into an OpenAPI v3 JSON string. | A task whose result is the text returned by convert To JSON. |
-| `IPostmanConverter.ConvertUrl(url, cancellationToken)` | Downloads a Postman collection from a URL and converts it into an OpenAPI document. | A task whose result is the requested openAPI Document. |
-| `IPostmanConverter.ConvertUrlToJson(url, cancellationToken)` | Downloads a Postman collection from a URL and converts it into an OpenAPI v3 JSON string. | A task whose result is the text returned by convert URL To JSON. |
-| `IPostmanConverter.ConvertFile(filePath, cancellationToken)` | Reads a Postman collection file and converts it into an OpenAPI document. | A task whose result is the requested openAPI Document. |
-| `IPostmanConverter.ConvertFileToJson(filePath, cancellationToken)` | Reads a Postman collection file and converts it into an OpenAPI v3 JSON string. | A task whose result is the text returned by convert File To JSON. |
-| `IPostmanConverter.SaveOpenApiFile(postmanFilePath, openApiFilePath, cancellationToken)` | Reads a Postman collection file and saves the converted OpenAPI JSON to disk. | A task that completes when the openapi file has been saved. |
-| `IPostmanConverter.SaveOpenApiUrl(url, openApiFilePath, cancellationToken)` | Downloads a Postman collection from a URL and saves the converted OpenAPI JSON to disk. | A task that completes when the openapi url has been saved. |
-| `IPostmanConverter.ToJson(document)` | Serializes an OpenAPI document as v3 JSON. | Returns `string`. |
-| `PostmanConverterRegistrar.AddPostmanConverterAsSingleton(services)` | Adds `IPostmanConverter` as a singleton service. | The same service collection, so additional registrations can be chained. |
-| `PostmanConverterRegistrar.AddPostmanConverterAsScoped(services)` | Adds `IPostmanConverter` as a scoped service. | The same service collection, so additional registrations can be chained. |
+string collectionJson = await File.ReadAllTextAsync(
+    "postman_collection.json",
+    cancellationToken);
 
-## Practical notes
+OpenApiDocument document =
+    await converter.Convert(collectionJson, cancellationToken);
 
-- Cancellation stops pending work; it does not undo work that has already completed.
+string openApiJson = converter.ToJson(document);
+```
+
+For direct file conversion and an atomic output replacement:
+
+```csharp
+await converter.SaveOpenApiFile(
+    "postman_collection.json",
+    "openapi.json",
+    cancellationToken);
+```
+
+`ConvertFile` and `ConvertFileToJson` return the document or JSON without writing an output file.
+
+## Convert a collection URL
+
+```csharp
+await converter.SaveOpenApiUrl(
+    "https://example.com/postman_collection.json",
+    "openapi.json",
+    cancellationToken);
+```
+
+`ConvertUrl` and `ConvertUrlToJson` use the registered HTTP client and return the result in memory. Only pass trusted URLs when this runs in a server process, because the converter performs an HTTP GET from that process and can reach destinations available to it.
+
+## Conversion behavior
+
+The converter maps nested folders to tags, collection variables to server/path values, request headers and bodies to operation inputs, saved examples to response schemas, and supported Postman authentication metadata to OpenAPI security schemes. Unsupported HTTP methods fail explicitly instead of being emitted as a different operation.
+
+Postman scripts, test assertions, and runtime behavior are not executable OpenAPI concepts and are not carried into the output. Review the generated document before using it for client generation or publishing.

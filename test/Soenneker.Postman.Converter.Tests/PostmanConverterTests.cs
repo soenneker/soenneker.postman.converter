@@ -1,17 +1,17 @@
+using System;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
+using AwesomeAssertions;
+using Microsoft.OpenApi;
 using Soenneker.Postman.Converter.Abstract;
 using Soenneker.Tests.HostedUnit;
-using System.Net.Http;
-using System.IO;
-using System.Threading.Tasks;
-using Microsoft.OpenApi;
-using AwesomeAssertions;
 
 namespace Soenneker.Postman.Converter.Tests;
 
 [ClassDataSource<Host>(Shared = SharedType.PerTestSession)]
 public sealed class PostmanConverterTests : HostedUnitTest
 {
-    private const string _fastlyPostmanPath = @"C:\cloudflare\fastly postman.json";
     private readonly IPostmanConverter _util;
 
     public PostmanConverterTests(Host host) : base(host)
@@ -20,60 +20,46 @@ public sealed class PostmanConverterTests : HostedUnitTest
     }
 
     [Test]
-    public void Default()
+    public async Task Concurrent_conversions_keep_operation_ids_isolated()
     {
+        const string collection = """
+                                  {
+                                    "info": { "name": "Example" },
+                                    "item": [
+                                      { "name": "List", "request": { "method": "GET", "url": "https://example.com/one" } },
+                                      { "name": "List", "request": { "method": "GET", "url": "https://example.com/two" } }
+                                    ]
+                                  }
+                                  """;
+
+        Task<OpenApiDocument>[] conversions = Enumerable.Range(0, 20)
+            .Select(_ => _util.Convert(collection).AsTask())
+            .ToArray();
+
+        OpenApiDocument[] documents = await Task.WhenAll(conversions);
+
+        foreach (OpenApiDocument document in documents)
+        {
+            document.Paths!["/one"].Operations![HttpMethod.Get].OperationId.Should().Be("List");
+            document.Paths["/two"].Operations![HttpMethod.Get].OperationId.Should().Be("List2");
+        }
     }
 
-    [Skip("Manual")]
     [Test]
-    public async Task ConvertFile_should_convert_fastly_collection()
+    public async Task Unsupported_methods_fail_instead_of_becoming_get()
     {
-        File.Exists(_fastlyPostmanPath).Should().BeTrue($"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
+        const string collection = """
+                                  {
+                                    "info": { "name": "Example" },
+                                    "item": [
+                                      { "name": "Custom", "request": { "method": "CUSTOM", "url": "https://example.com/custom" } }
+                                    ]
+                                  }
+                                  """;
 
-        OpenApiDocument result = await _util.ConvertFile(_fastlyPostmanPath, System.Threading.CancellationToken.None);
+        Func<Task> action = () => _util.Convert(collection).AsTask();
 
-        Assert.NotNull(result);
-        Assert.NotNull(result.Info);
-        result.Info.Title.Should().Be("Fastly API");
-        Assert.NotNull(result.Paths);
-        result.Paths.Should().NotBeEmpty();
-        result.Paths.TryGetValue("/customer/{customer_id}/billing_address", out IOpenApiPathItem? pathItem).Should().BeTrue();
-        Assert.NotNull(pathItem);
-        Assert.NotNull(result.Servers);
-        result.Servers.Should().Contain(server => server.Url == "https://api.fastly.com");
-        Assert.NotNull(pathItem!.Operations);
-        pathItem.Operations.TryGetValue(HttpMethod.Get, out OpenApiOperation? operation).Should().BeTrue();
-        Assert.NotNull(operation);
-        operation!.Summary.Should().Be("Get a billing address");
-        Assert.NotNull(operation.Responses);
-        operation.Responses.Keys.Should().Contain("200");
-    }
-
-    [Skip("Manual")]
-    [Test]
-    public async Task SaveOpenApiFile_should_write_openapi_json_for_fastly_collection()
-    {
-        File.Exists(_fastlyPostmanPath).Should().BeTrue($"Expected Fastly Postman collection to exist at '{_fastlyPostmanPath}'.");
-
-        string outputPath = Path.Combine(Path.GetTempPath(), $"fastly-openapi-{Path.GetRandomFileName()}.json");
-
-        try
-        {
-            await _util.SaveOpenApiFile(_fastlyPostmanPath, outputPath, System.Threading.CancellationToken.None);
-
-            File.Exists(outputPath).Should().BeTrue();
-
-            string json = await File.ReadAllTextAsync(outputPath, System.Threading.CancellationToken.None);
-
-            json.Should().Contain("\"openapi\"");
-            json.Should().Contain("\"Fastly API\"");
-            json.Should().Contain("\"/customer/{customer_id}/billing_address\"");
-        }
-        finally
-        {
-            if (File.Exists(outputPath))
-                File.Delete(outputPath);
-        }
+        await action.Should().ThrowAsync<InvalidOperationException>()
+                    .WithMessage("*unsupported HTTP method 'CUSTOM'*");
     }
 }
-

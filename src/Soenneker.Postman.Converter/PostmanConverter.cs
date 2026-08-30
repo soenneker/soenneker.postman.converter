@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 
 namespace Soenneker.Postman.Converter;
 
-/// <inheritdoc cref="IPostmanConverter"/>
 public sealed class PostmanConverter : IPostmanConverter
 {
     private static readonly Regex _postmanVariableRegex = new("{{\\s*([^}]+?)\\s*}}", RegexOptions.Compiled);
@@ -28,8 +27,6 @@ public sealed class PostmanConverter : IPostmanConverter
     };
 
     private readonly IHttpClientCache _httpClientCache;
-    private readonly HashSet<string> _operationIds = new(StringComparer.Ordinal);
-
     public PostmanConverter(IHttpClientCache httpClientCache)
     {
         _httpClientCache = httpClientCache;
@@ -79,14 +76,14 @@ public sealed class PostmanConverter : IPostmanConverter
         AddServers(document, root, variables);
         AddCollectionSecurityScheme(document, root);
 
-        _operationIds.Clear();
+        var operationIds = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (JsonNode? child in items)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             if (child is JsonObject childObject)
-                ProcessItem(childObject, document, variables, [], root["auth"], cancellationToken);
+                ProcessItem(childObject, document, variables, operationIds, [], root["auth"], cancellationToken);
         }
 
         return document;
@@ -169,8 +166,20 @@ public sealed class PostmanConverter : IPostmanConverter
         if (!string.IsNullOrWhiteSpace(directory))
             Directory.CreateDirectory(directory);
 
-        await File.WriteAllTextAsync(openApiFilePath, json, cancellationToken)
-                  .ConfigureAwait(false);
+        string fullPath = Path.GetFullPath(openApiFilePath);
+        string tempPath = $"{fullPath}.{Path.GetRandomFileName()}.tmp";
+
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, json, cancellationToken)
+                      .ConfigureAwait(false);
+            File.Move(tempPath, fullPath, true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
     }
 
     private static JsonObject NormalizeCollectionRoot(JsonObject root)
@@ -181,8 +190,8 @@ public sealed class PostmanConverter : IPostmanConverter
         return root;
     }
 
-    private void ProcessItem(JsonObject item, OpenApiDocument document, IReadOnlyDictionary<string, PostmanVariable> variables, List<string> parentFolders,
-        JsonNode? inheritedAuth, CancellationToken cancellationToken)
+    private void ProcessItem(JsonObject item, OpenApiDocument document, IReadOnlyDictionary<string, PostmanVariable> variables,
+        HashSet<string> operationIds, List<string> parentFolders, JsonNode? inheritedAuth, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -201,7 +210,7 @@ public sealed class PostmanConverter : IPostmanConverter
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (child is JsonObject childObject)
-                    ProcessItem(childObject, document, variables, nextFolders, effectiveAuth, cancellationToken);
+                    ProcessItem(childObject, document, variables, operationIds, nextFolders, effectiveAuth, cancellationToken);
             }
 
             return;
@@ -212,11 +221,11 @@ public sealed class PostmanConverter : IPostmanConverter
         if (request == null)
             return;
 
-        AddOperation(item, request, document, variables, parentFolders, effectiveAuth);
+        AddOperation(item, request, document, variables, operationIds, parentFolders, effectiveAuth);
     }
 
     private void AddOperation(JsonObject item, JsonObject request, OpenApiDocument document, IReadOnlyDictionary<string, PostmanVariable> variables,
-        IReadOnlyList<string> parentFolders, JsonNode? inheritedAuth)
+        HashSet<string> operationIds, IReadOnlyList<string> parentFolders, JsonNode? inheritedAuth)
     {
         string methodText = GetString(request, "method")
                             ?.Trim()
@@ -234,7 +243,7 @@ public sealed class PostmanConverter : IPostmanConverter
         {
             Summary = GetString(item, "name"),
             Description = GetString(request, "description") ?? GetString(item, "description"),
-            OperationId = BuildOperationId(methodText, path, GetString(item, "name")),
+            OperationId = BuildOperationId(methodText, path, GetString(item, "name"), operationIds),
             Parameters = new List<IOpenApiParameter>(),
             Responses = new OpenApiResponses()
         };
@@ -258,7 +267,7 @@ public sealed class PostmanConverter : IPostmanConverter
     {
         if (variables.TryGetValue("fastly_url", out PostmanVariable? fastlyUrl) && !string.IsNullOrWhiteSpace(fastlyUrl.Value))
         {
-            document.Servers.Add(new OpenApiServer { Url = fastlyUrl.Value! });
+            document.Servers!.Add(new OpenApiServer { Url = fastlyUrl.Value! });
             return;
         }
 
@@ -269,7 +278,7 @@ public sealed class PostmanConverter : IPostmanConverter
         {
             if (TryGetFirstServerUrl(child as JsonObject, out string? url))
             {
-                document.Servers.Add(new OpenApiServer { Url = url! });
+                document.Servers!.Add(new OpenApiServer { Url = url! });
                 return;
             }
         }
@@ -313,7 +322,7 @@ public sealed class PostmanConverter : IPostmanConverter
         if (!TryReadApiKeySecurity(auth, out string? headerName, out string? description))
             return;
 
-        document.Components.SecuritySchemes["apiKeyAuth"] = new OpenApiSecurityScheme
+        document.Components!.SecuritySchemes!["apiKeyAuth"] = new OpenApiSecurityScheme
         {
             Type = SecuritySchemeType.ApiKey,
             Name = headerName!,
@@ -339,7 +348,7 @@ public sealed class PostmanConverter : IPostmanConverter
 
         if (!string.IsNullOrWhiteSpace(authorizationHeader))
         {
-            document.Components.SecuritySchemes["authorizationHeader"] = new OpenApiSecurityScheme
+            document.Components!.SecuritySchemes!["authorizationHeader"] = new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.ApiKey,
                 Name = "Authorization",
@@ -396,7 +405,7 @@ public sealed class PostmanConverter : IPostmanConverter
 
             string variableName = segment[1..^1];
 
-            operation.Parameters.Add(new OpenApiParameter
+            operation.Parameters!.Add(new OpenApiParameter
             {
                 Name = variableName,
                 In = ParameterLocation.Path,
@@ -422,7 +431,7 @@ public sealed class PostmanConverter : IPostmanConverter
             if (string.IsNullOrWhiteSpace(key))
                 continue;
 
-            operation.Parameters.Add(new OpenApiParameter
+            operation.Parameters!.Add(new OpenApiParameter
             {
                 Name = key,
                 In = ParameterLocation.Query,
@@ -448,7 +457,7 @@ public sealed class PostmanConverter : IPostmanConverter
             if (string.IsNullOrWhiteSpace(name) || _ignoredHeaderNames.Contains(name))
                 continue;
 
-            operation.Parameters.Add(new OpenApiParameter
+            operation.Parameters!.Add(new OpenApiParameter
             {
                 Name = name,
                 In = ParameterLocation.Header,
@@ -539,7 +548,7 @@ public sealed class PostmanConverter : IPostmanConverter
     {
         if (responses == null || responses.Count == 0)
         {
-            operation.Responses["200"] = new OpenApiResponse { Description = "Success" };
+            operation.Responses!["200"] = new OpenApiResponse { Description = "Success" };
             return;
         }
 
@@ -574,11 +583,11 @@ public sealed class PostmanConverter : IPostmanConverter
                 };
             }
 
-            operation.Responses[code] = openApiResponse;
+            operation.Responses![code] = openApiResponse;
         }
     }
 
-    private string BuildOperationId(string method, string path, string? name)
+    private static string BuildOperationId(string method, string path, string? name, HashSet<string> operationIds)
     {
         string seed = !string.IsNullOrWhiteSpace(name) ? name! : $"{method} {path}";
 
@@ -590,7 +599,7 @@ public sealed class PostmanConverter : IPostmanConverter
         string unique = candidate;
         var suffix = 2;
 
-        while (!_operationIds.Add(unique))
+        while (!operationIds.Add(unique))
         {
             unique = $"{candidate}{suffix}";
             suffix++;
@@ -737,7 +746,7 @@ public sealed class PostmanConverter : IPostmanConverter
             "HEAD" => HttpMethod.Head,
             "OPTIONS" => HttpMethod.Options,
             "TRACE" => HttpMethod.Trace,
-            _ => HttpMethod.Get
+            _ => throw new InvalidOperationException($"Postman request uses unsupported HTTP method '{method}'.")
         };
     }
 
