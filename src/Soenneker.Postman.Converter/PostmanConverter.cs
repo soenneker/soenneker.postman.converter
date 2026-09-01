@@ -1,7 +1,10 @@
+using Soenneker.Extensions.ValueTask;
+using Soenneker.Extensions.Task;
 using Microsoft.OpenApi;
 using Soenneker.Postman.Converter.Abstract;
 using Soenneker.Utils.HttpClientCache.Abstract;
 using Soenneker.Utils.File.Abstract;
+using Soenneker.Utils.PooledStringBuilders;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -96,7 +99,7 @@ public sealed class PostmanConverter : IPostmanConverter
     public async ValueTask<string> ConvertToJson(string postmanJson, CancellationToken cancellationToken = default)
     {
         OpenApiDocument document = await Convert(postmanJson, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
         return ToJson(document);
     }
 
@@ -104,49 +107,49 @@ public sealed class PostmanConverter : IPostmanConverter
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(url);
         HttpClient httpClient = await _httpClientCache.Get(nameof(PostmanConverter), cancellationToken)
-                                                      .ConfigureAwait(false);
+                                                      .NoSync();
         string postmanJson = await httpClient.GetStringAsync(url, cancellationToken)
-                                             .ConfigureAwait(false);
+                                             .NoSync();
         return await Convert(postmanJson, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
     }
 
     public async ValueTask<string> ConvertUrlToJson(string url, CancellationToken cancellationToken = default)
     {
         OpenApiDocument document = await ConvertUrl(url, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
         return ToJson(document);
     }
 
     public async ValueTask<OpenApiDocument> ConvertFile(string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-        string postmanJson = await _fileUtil.Read(filePath, log: false, cancellationToken).ConfigureAwait(false);
+        string postmanJson = await _fileUtil.Read(filePath, log: false, cancellationToken).NoSync();
         return await Convert(postmanJson, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
     }
 
     public async ValueTask<string> ConvertFileToJson(string filePath, CancellationToken cancellationToken = default)
     {
         OpenApiDocument document = await ConvertFile(filePath, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
         return ToJson(document);
     }
 
     public async ValueTask SaveOpenApiFile(string postmanFilePath, string openApiFilePath, CancellationToken cancellationToken = default)
     {
         string json = await ConvertFileToJson(postmanFilePath, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
         await Save(openApiFilePath, json, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
     }
 
     public async ValueTask SaveOpenApiUrl(string url, string openApiFilePath, CancellationToken cancellationToken = default)
     {
         string json = await ConvertUrlToJson(url, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
         await Save(openApiFilePath, json, cancellationToken)
-            .ConfigureAwait(false);
+            .NoSync();
     }
 
     public string ToJson(OpenApiDocument document)
@@ -163,7 +166,7 @@ public sealed class PostmanConverter : IPostmanConverter
     private async ValueTask Save(string openApiFilePath, string json, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(openApiFilePath);
-        await _fileUtil.WriteAtomically(openApiFilePath, json, log: false, cancellationToken).ConfigureAwait(false);
+        await _fileUtil.WriteAtomically(openApiFilePath, json, log: false, cancellationToken).NoSync();
     }
 
     private static JsonObject NormalizeCollectionRoot(JsonObject root)
@@ -878,7 +881,7 @@ public sealed class PostmanConverter : IPostmanConverter
 
     private static string SanitizeIdentifier(string value)
     {
-        var builder = new StringBuilder(value.Length);
+        using var builder = new PooledStringBuilder(value.Length);
         var capitalizeNext = false;
 
         foreach (char c in value)
