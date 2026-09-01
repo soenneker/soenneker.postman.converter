@@ -1,6 +1,7 @@
 using Microsoft.OpenApi;
 using Soenneker.Postman.Converter.Abstract;
 using Soenneker.Utils.HttpClientCache.Abstract;
+using Soenneker.Utils.File.Abstract;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,9 +28,12 @@ public sealed class PostmanConverter : IPostmanConverter
     };
 
     private readonly IHttpClientCache _httpClientCache;
-    public PostmanConverter(IHttpClientCache httpClientCache)
+    private readonly IFileUtil _fileUtil;
+
+    public PostmanConverter(IHttpClientCache httpClientCache, IFileUtil fileUtil)
     {
         _httpClientCache = httpClientCache;
+        _fileUtil = fileUtil;
     }
 
     public async ValueTask<OpenApiDocument> Convert(string postmanJson, CancellationToken cancellationToken = default)
@@ -117,8 +121,7 @@ public sealed class PostmanConverter : IPostmanConverter
     public async ValueTask<OpenApiDocument> ConvertFile(string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-        string postmanJson = await File.ReadAllTextAsync(filePath, cancellationToken)
-                                       .ConfigureAwait(false);
+        string postmanJson = await _fileUtil.Read(filePath, log: false, cancellationToken).ConfigureAwait(false);
         return await Convert(postmanJson, cancellationToken)
             .ConfigureAwait(false);
     }
@@ -157,29 +160,10 @@ public sealed class PostmanConverter : IPostmanConverter
         return stringWriter.ToString();
     }
 
-    private static async ValueTask Save(string openApiFilePath, string json, CancellationToken cancellationToken)
+    private async ValueTask Save(string openApiFilePath, string json, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(openApiFilePath);
-
-        string? directory = Path.GetDirectoryName(openApiFilePath);
-
-        if (!string.IsNullOrWhiteSpace(directory))
-            Directory.CreateDirectory(directory);
-
-        string fullPath = Path.GetFullPath(openApiFilePath);
-        string tempPath = $"{fullPath}.{Path.GetRandomFileName()}.tmp";
-
-        try
-        {
-            await File.WriteAllTextAsync(tempPath, json, cancellationToken)
-                      .ConfigureAwait(false);
-            File.Move(tempPath, fullPath, true);
-        }
-        finally
-        {
-            if (File.Exists(tempPath))
-                File.Delete(tempPath);
-        }
+        await _fileUtil.WriteAtomically(openApiFilePath, json, log: false, cancellationToken).ConfigureAwait(false);
     }
 
     private static JsonObject NormalizeCollectionRoot(JsonObject root)

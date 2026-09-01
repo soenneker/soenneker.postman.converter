@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Soenneker.Postman.Converter.Abstract;
 using Soenneker.Utils.HttpClientCache.Registrar;
+using Soenneker.Utils.File.Registrars;
 
 namespace Soenneker.Postman.Converter.Registrars;
 
@@ -18,6 +19,7 @@ public static class PostmanConverterRegistrar
     public static IServiceCollection AddPostmanConverterAsSingleton(this IServiceCollection services)
     {
         services.AddHttpClientCacheAsSingleton()
+                .AddFileUtilAsSingleton()
                 .TryAddSingleton<IPostmanConverter, PostmanConverter>();
 
         return services;
@@ -31,6 +33,7 @@ public static class PostmanConverterRegistrar
     public static IServiceCollection AddPostmanConverterAsScoped(this IServiceCollection services)
     {
         services.AddHttpClientCacheAsSingleton()
+                .AddFileUtilAsScoped()
                 .TryAddScoped<IPostmanConverter, PostmanConverter>();
 
         return services;
