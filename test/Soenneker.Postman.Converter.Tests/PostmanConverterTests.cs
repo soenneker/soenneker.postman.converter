@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.OpenApi;
@@ -20,7 +21,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Concurrent_conversions_keep_operation_ids_isolated()
+    public async Task Concurrent_conversions_keep_operation_ids_isolated(CancellationToken cancellationToken)
     {
         const string collection = """
                                   {
@@ -33,7 +34,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
                                   """;
 
         Task<OpenApiDocument>[] conversions = Enumerable.Range(0, 20)
-            .Select(_ => _util.Convert(collection).AsTask())
+            .Select(_ => _util.Convert(collection, cancellationToken: cancellationToken).AsTask())
             .ToArray();
 
         OpenApiDocument[] documents = await Task.WhenAll(conversions);
@@ -46,7 +47,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Unsupported_methods_fail_instead_of_becoming_get()
+    public async Task Unsupported_methods_fail_instead_of_becoming_get(CancellationToken cancellationToken)
     {
         const string collection = """
                                   {
@@ -57,7 +58,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
                                   }
                                   """;
 
-        Func<Task> action = () => _util.Convert(collection).AsTask();
+        Func<Task> action = () => _util.Convert(collection, cancellationToken: cancellationToken).AsTask();
 
         await action.Should().ThrowAsync<InvalidOperationException>()
                     .WithMessage("*unsupported HTTP method 'CUSTOM'*");
