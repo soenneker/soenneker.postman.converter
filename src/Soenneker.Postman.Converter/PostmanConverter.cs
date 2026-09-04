@@ -19,6 +19,7 @@ using System.Threading.Tasks;
 
 namespace Soenneker.Postman.Converter;
 
+/// <inheritdoc cref="IPostmanConverter" />
 public sealed class PostmanConverter : IPostmanConverter
 {
     private static readonly Regex _postmanVariableRegex = new("{{\\s*([^}]+?)\\s*}}", RegexOptions.Compiled);
