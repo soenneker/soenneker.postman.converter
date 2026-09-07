@@ -622,7 +622,8 @@ public sealed class PostmanConverter : IPostmanConverter
 
     private static string BuildPathFromRaw(string raw)
     {
-        string withoutQuery = raw.Split('?', 2)[0];
+        int queryStart = raw.IndexOf('?');
+        string withoutQuery = queryStart >= 0 ? raw[..queryStart] : raw;
         string normalized = ReplacePostmanVariables(withoutQuery);
 
         if (Uri.TryCreate(normalized, UriKind.Absolute, out Uri? absoluteUri))
@@ -777,10 +778,9 @@ public sealed class PostmanConverter : IPostmanConverter
         if (string.IsNullOrWhiteSpace(contentType))
             return null;
 
-        string first = contentType.Split(',', 2)[0]
-                                  .Trim();
-        return first.Split(';', 2)[0]
-                    .Trim();
+        ReadOnlySpan<char> value = contentType.AsSpan();
+        int separator = value.IndexOfAny(',', ';');
+        return separator >= 0 ? value[..separator].Trim().ToString() : contentType.Trim();
     }
 
     private static string GetDefaultContentType(string mode)
