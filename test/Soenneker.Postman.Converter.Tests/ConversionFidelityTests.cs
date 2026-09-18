@@ -424,6 +424,56 @@ public sealed class ConversionFidelityTests : HostedUnitTest
         ((JsonArray)document["x-postman-warnings"]!).Count.Should().Be(0);
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Angle_bracket_placeholders_become_required_path_parameters(bool structured, CancellationToken cancellationToken)
+    {
+        const string raw = "{{baseUrl}}/leadnotifications/<webhook id>";
+        JsonNode url = structured ? new JsonObject
+        {
+            ["raw"] = raw, ["host"] = new JsonArray("{{baseUrl}}"),
+            ["path"] = new JsonArray("leadnotifications", "<webhook id>"),
+            ["variable"] = new JsonArray(new JsonObject { ["key"] = "webhook id", ["value"] = "007", ["description"] = "Webhook identifier" })
+        } : JsonValue.Create(raw)!;
+        var request = new JsonObject { ["method"] = "DELETE", ["url"] = url };
+        JsonObject document = await Convert(Collection(new JsonObject { ["name"] = "Delete webhook", ["request"] = request }.ToJsonString()),
+            cancellationToken, new PostmanConversionOptions { Variables = new Dictionary<string, string?> { ["baseUrl"] = "https://api.linkedin.com/rest" } });
+        JsonObject operation = Operation(document, "/leadnotifications/{webhook id}", "delete");
+        JsonObject parameter = Parameter(operation, "webhook id");
+        String(parameter["in"]).Should().Be("path");
+        parameter["required"]!.GetValue<bool>().Should().BeTrue();
+        String(parameter["schema"]!["type"]).Should().Be("string");
+        if (structured)
+        {
+            String(parameter["description"]).Should().Be("Webhook identifier");
+            String(parameter["examples"]!["example1"]!["value"]).Should().Be("007");
+        }
+        JsonNode.DeepEquals(operation["x-postman-variants"]![0]!["request"], request).Should().BeTrue();
+        ((JsonArray)operation["x-postman-warnings"]!).Should().Contain(warning => String(warning)!.Contains("Angle-bracket placeholder"));
+    }
+
+    [Test]
+    public async Task Angle_bracket_conversion_preserves_encoded_literals_existing_templates_and_query_values(CancellationToken cancellationToken)
+    {
+        JsonObject document = await Convert(Collection("""
+            {"name":"Mixed","request":{"url":"https://example.com/%3Cencoded%20literal%3E/{existing<name>}/(id:<first>,other:<second>)?q=<query>"}}
+            """), cancellationToken);
+        JsonObject operation = Operation(document, "/%3Cencoded%20literal%3E/{existing<name>}/(id:{first},other:{second})");
+        Parameters(operation).Where(p => String(p["in"]) == "path").Select(p => String(p["name"]))
+            .Should().BeEquivalentTo("existing<name>", "first", "second");
+        String(Parameter(operation, "q")["examples"]!["example1"]!["value"]).Should().Be("<query>");
+    }
+
+    [Test]
+    public async Task Strict_mode_reports_inferred_angle_bracket_parameters(CancellationToken cancellationToken)
+    {
+        Func<Task> conversion = () => _converter.Convert(Collection("""
+            {"name":"Delete webhook","request":{"url":"https://example.com/leadnotifications/<webhook id>"}}
+            """), new PostmanConversionOptions { FailOnWarnings = true }, cancellationToken).AsTask();
+        await conversion.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Angle-bracket placeholder*webhook id*");
+    }
+
     private async Task<JsonObject> Convert(string source, CancellationToken cancellationToken, PostmanConversionOptions? options = null)
     {
         OpenApiDocument document = await _converter.Convert(source, options ?? new PostmanConversionOptions(), cancellationToken);

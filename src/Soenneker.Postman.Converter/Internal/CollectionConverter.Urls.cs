@@ -63,6 +63,15 @@ internal sealed partial class CollectionConverter
         path = "/" + path.TrimStart('/');
         path = Variables.Replace(path, match => "{" + match.Groups[1].Value.Trim() + "}");
         path = Regex.Replace(path, @"(^|/):([^/]+)", "$1{$2}");
+        // Some collections use documentation-style placeholders instead of Postman variables.
+        // Leave existing templates and percent-encoded literals intact.
+        path = Regex.Replace(path, @"\{[^{}]+\}|<([^<>/{}]+)>", match =>
+        {
+            if (!match.Groups[1].Success || string.IsNullOrWhiteSpace(match.Groups[1].Value))
+                return match.Value;
+            Warn(operation, $"Angle-bracket placeholder '{match.Value}' was converted to a required path parameter; verify its meaning against the API documentation.");
+            return "{" + match.Groups[1].Value.Trim() + "}";
+        });
         JsonObject? serverObject = null;
         if (server.Length > 0)
         {

@@ -110,6 +110,7 @@ A collection describes example requests, not the complete endpoint contract. The
 
 - JSON strings stay strings, including `"001"` and `"true"`. Property names are preserved exactly. Schemas inspect every array element and combine observed shapes with `anyOf` where needed.
 - Example fields and request bodies are not assumed required. Query, header, and form values remain strings because their wire values do not prove an endpoint's logical type. Path parameters are required by OpenAPI.
+- Documentation-style path placeholders such as `<webhook id>` become `{webhook id}` with matching required string parameters. This inference produces a warning, so strict mode rejects it. Original requests, percent-encoded literals, and query values are preserved.
 - Null-only values and empty arrays do not establish a type. Unquoted Postman body variables remain unconstrained. Nonstandard or invalid JSON is preserved in `x-postman-raw-body` with diagnostics; it is not relabeled as a JSON string payload.
 - Missing saved responses produce a documented `default` response, not an invented successful status or response schema. `Accept` does not establish a response's actual media type.
 - Configured OAuth scopes are listed on the security scheme, but are not declared mandatory for every endpoint. Incomplete OAuth configuration falls back to bearer transport with a warning. Unsupported authentication remains visible in source metadata and warnings.
