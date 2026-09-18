@@ -282,14 +282,80 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Cancellation_and_malformed_requests_fail_explicitly(CancellationToken cancellationToken)
+    public async Task Cancellation_and_malformed_request_structures_fail_explicitly(CancellationToken cancellationToken)
     {
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         Func<Task> conversion = () => _converter.Convert(Collection("""{"request":"https://example.com"}"""), cancelled.Token).AsTask();
         await conversion.Should().ThrowAsync<OperationCanceledException>();
-        Func<Task> malformed = () => _converter.Convert(Collection("""{"name":"Bad","request":{"method":"GET"}}"""), cancellationToken).AsTask();
-        await malformed.Should().ThrowAsync<InvalidOperationException>().WithMessage("*missing a URL*");
+        Func<Task> malformed = () => _converter.Convert(Collection("""{"name":"Bad"}"""), cancellationToken).AsTask();
+        await malformed.Should().ThrowAsync<InvalidOperationException>().WithMessage("*missing a request or item array*");
+    }
+
+    [Test]
+    public async Task Content_apis_file_conversion_preserves_unmapped_request_and_converts_all_other_requests(CancellationToken cancellationToken)
+    {
+        string input = Path.Combine(AppContext.BaseDirectory, "Fixtures", "linkedin-content-apis.postman.json");
+        string output = Path.GetTempFileName();
+        try
+        {
+            // Exercise the same default file entry point used by the LinkedIn runner.
+            await _converter.SaveOpenApiFile(input, output, cancellationToken);
+            string json = await File.ReadAllTextAsync(output, cancellationToken);
+            OpenApiDocument.Parse(json, "json").Diagnostic!.Errors.Should().BeEmpty();
+            var document = (JsonObject)JsonNode.Parse(json)!;
+            JsonObject[] sources = Requests((JsonArray)JsonNode.Parse(await File.ReadAllTextAsync(input, cancellationToken))!["item"]!).ToArray();
+            sources.Length.Should().Be(55);
+            JsonObject[] mapped = Operations(document).SelectMany(op => ((JsonArray)op["x-postman-variants"]!).OfType<JsonObject>()).ToArray();
+            mapped.Length.Should().Be(54);
+            var unmapped = (JsonArray)document["x-postman-unmapped-requests"]!;
+            unmapped.Count.Should().Be(1);
+            String(unmapped[0]!["reason"]).Should().Be("missing-url");
+            JsonObject missing = sources.Single(item => String(item["name"]) == "Get document content");
+            JsonNode.DeepEquals(unmapped[0]!["item"], missing).Should().BeTrue();
+            ((JsonArray)unmapped[0]!["folders"]!).Count.Should().BeGreaterThan(0);
+            mapped.Should().NotContain(variant => String(variant["name"]) == "Get document content");
+            foreach (JsonObject item in sources.Where(item => !ReferenceEquals(item, missing)))
+                mapped.Should().Contain(variant => JsonNode.DeepEquals(variant["request"], item["request"]) && String(variant["id"]) == String(item["id"]));
+            ((JsonArray)document["x-postman-warnings"]!).Should().Contain(warning => String(warning)!.Contains("Get document content: Request is missing a URL"));
+        }
+        finally
+        {
+            File.Delete(output);
+        }
+    }
+
+    [Test]
+    public async Task Empty_urls_are_preserved_without_inventing_endpoints_or_consuming_operation_ids(CancellationToken cancellationToken)
+    {
+        foreach (string url in new[] { "null", "\"\"", "\"  \"", "{}", "{\"raw\":\"\"}", "{\"host\":[]}", "{\"path\":[]}", "{\"query\":[{\"key\":\"q\",\"value\":\"x\"}]}" })
+        {
+            var missing = new JsonObject { ["name"] = "Read", ["request"] = new JsonObject { ["method"] = "GET", ["url"] = JsonNode.Parse(url) } };
+            JsonObject document = await Convert(Collection(missing.ToJsonString() + "," + """{"name":"Read","request":{"url":"https://example.com/valid"}}"""), cancellationToken);
+            ((JsonObject)document["paths"]!).Select(pair => pair.Key).Should().BeEquivalentTo("/valid");
+            String(Operation(document, "/valid")["operationId"]).Should().Be("Read");
+            JsonNode.DeepEquals(document["x-postman-unmapped-requests"]![0]!["item"], missing).Should().BeTrue();
+        }
+    }
+
+    [Test]
+    public async Task Missing_urls_still_fail_in_strict_mode(CancellationToken cancellationToken)
+    {
+        Func<Task> conversion = () => _converter.Convert(Collection("""{"name":"Incomplete","request":{"method":"GET"}}"""),
+            new PostmanConversionOptions { FailOnWarnings = true }, cancellationToken).AsTask();
+        await conversion.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Incomplete*missing a URL*");
+    }
+
+    [Test]
+    public async Task Explicit_root_paths_remain_valid_and_have_no_unmapped_extension(CancellationToken cancellationToken)
+    {
+        JsonObject document = await Convert(Collection("""
+            {"name":"Root","request":{"url":{"path":"/"}}},
+            {"name":"Host","request":{"method":"POST","url":{"protocol":"https","host":["example","com"],"path":[]}}}
+            """), cancellationToken);
+        Operation(document, "/").Should().NotBeNull();
+        Operation(document, "/", "post").Should().NotBeNull();
+        document["x-postman-unmapped-requests"].Should().BeNull();
     }
 
     [Test]

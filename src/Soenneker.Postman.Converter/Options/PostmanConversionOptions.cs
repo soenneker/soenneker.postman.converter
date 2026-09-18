@@ -11,6 +11,9 @@ public sealed class PostmanConversionOptions
     /// </summary>
     public IReadOnlyDictionary<string, string?> Variables { get; init; } = new Dictionary<string, string?>();
 
-    /// <summary>Throws when conversion encounters an ambiguity or unsupported feature recorded in x-postman-warnings.</summary>
+    /// <summary>
+    /// Throws when conversion encounters an ambiguity or unsupported feature recorded in x-postman-warnings,
+    /// including a request with no URL. Otherwise URL-less source items are preserved in x-postman-unmapped-requests.
+    /// </summary>
     public bool FailOnWarnings { get; init; }
 }

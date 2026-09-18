@@ -120,11 +120,15 @@ Document and operation `x-postman-warnings` extensions describe missing informat
 
 Source extensions and examples contain original collection data, including authentication configuration when present. Treat the generated file with the same confidentiality as the input collection.
 
-Unsupported HTTP methods and malformed request structures fail explicitly. To establish a complete production contract, supplement the collection with authoritative endpoint documentation or observed responses; conversion alone cannot prove endpoint behavior.
+Requests with missing or empty URLs cannot establish an endpoint. By default, conversion continues and preserves their complete source items, folder paths, effective authentication, and reasons in the document's `x-postman-unmapped-requests` extension. They also generate `x-postman-warnings`; no placeholder endpoint is invented. `FailOnWarnings = true` rejects these requests. An explicit `/` path remains a valid relative root endpoint.
+
+Unsupported HTTP methods and malformed request structures (such as an item with neither a request nor children) still fail explicitly. To establish a complete production contract, supplement the collection with authoritative endpoint documentation or observed responses; conversion alone cannot prove endpoint behavior.
 
 ### Regression coverage
 
 The offline regression fixture is the supplied LinkedIn Campaign Management collection: 72 requests, 25 generated paths, and 42 combined operations. It has no saved responses, unresolved environment/upload URLs, and a request containing `{{baseUrl}}adAccounts` without a separator. The converter preserves these facts and reports them instead of silently guessing fixes.
+
+The Content APIs fixture covers the runner's `SaveOpenApiFile` entry point: 55 source requests, including `Get document content`, which has no URL. All 54 usable requests are converted, and the incomplete item is retained in `x-postman-unmapped-requests`.
 
 Run tests with Microsoft Testing Platform:
 

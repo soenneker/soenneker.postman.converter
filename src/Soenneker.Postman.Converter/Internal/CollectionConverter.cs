@@ -18,6 +18,7 @@ internal sealed partial class CollectionConverter(PostmanConversionOptions optio
     private readonly JsonObject _schemes = new();
     private readonly JsonArray _tags = [];
     private readonly JsonArray _warnings = [];
+    private readonly JsonArray _unmappedRequests = [];
     private readonly HashSet<string> _operationIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _canonicalPaths = new(StringComparer.Ordinal);
     private readonly HashSet<string> _tagNames = new(StringComparer.Ordinal);
@@ -46,6 +47,8 @@ internal sealed partial class CollectionConverter(PostmanConversionOptions optio
             document["x-postman-variables"] = root["variable"]!.DeepClone();
         WarnScripts(root, "collection");
         Visit(items, ReadVariables(root["variable"]), root["auth"] as JsonObject, [], null);
+        if (_unmappedRequests.Count > 0)
+            document["x-postman-unmapped-requests"] = _unmappedRequests;
         return document;
     }
 
@@ -87,12 +90,25 @@ internal sealed partial class CollectionConverter(PostmanConversionOptions optio
         var operation = new JsonObject
         {
             ["summary"] = name,
-            ["operationId"] = UniqueIdentifier(name),
             ["parameters"] = new JsonArray(),
             ["responses"] = new JsonObject()
         };
         SetDescription(operation, request["description"] ?? item["description"]);
-        var url = ReadUrl(request["url"], variables, operation);
+        var parsedUrl = ReadUrl(request["url"], variables, operation);
+        if (parsedUrl == null)
+        {
+            _unmappedRequests.Add(new JsonObject
+            {
+                ["reason"] = "missing-url",
+                ["item"] = item.DeepClone(),
+                ["folders"] = new JsonArray(folders.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()),
+                ["effectiveAuth"] = auth?.DeepClone(),
+                ["x-postman-warnings"] = operation["x-postman-warnings"]?.DeepClone()
+            });
+            return;
+        }
+        var url = parsedUrl.Value;
+        operation["operationId"] = UniqueIdentifier(name);
         string path = url.Path;
         // OpenAPI forbids paths that differ only in template names. Keep the first spelling and remap parameters.
         string shape = Templates.Replace(path, "{}");

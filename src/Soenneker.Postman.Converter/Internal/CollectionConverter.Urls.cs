@@ -8,15 +8,18 @@ namespace Soenneker.Postman.Converter.Internal;
 
 internal sealed partial class CollectionConverter
 {
-    private (string Path, JsonObject? Server) ReadUrl(JsonNode? node, Dictionary<string, Variable> variables, JsonObject operation)
+    private (string Path, JsonObject? Server)? ReadUrl(JsonNode? node, Dictionary<string, Variable> variables, JsonObject operation)
     {
         JsonObject? obj = node as JsonObject;
         string? raw = obj == null ? Text(node) : Text(obj["raw"]);
         string? host = obj == null ? null : JoinUrlPart(obj["host"], ".");
         string? protocol = obj == null ? null : Text(obj["protocol"]);
         string? structuredPath = obj == null ? null : JoinUrlPart(obj["path"], "/");
-        if (string.IsNullOrWhiteSpace(raw) && string.IsNullOrWhiteSpace(host) && structuredPath == null)
-            throw new InvalidOperationException($"Postman request '{Text(operation["summary"])}' is missing a URL.");
+        if (string.IsNullOrWhiteSpace(raw) && string.IsNullOrWhiteSpace(host) && string.IsNullOrWhiteSpace(structuredPath))
+        {
+            Warn(operation, "Request is missing a URL. No endpoint was generated; the source item is preserved in x-postman-unmapped-requests.");
+            return null;
+        }
 
         string url = raw ?? "";
         if (!string.IsNullOrEmpty(host) && (structuredPath != null || string.IsNullOrWhiteSpace(raw)))
