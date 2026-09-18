@@ -128,7 +128,7 @@ internal sealed partial class CollectionConverter(PostmanConversionOptions optio
             operation["servers"] = new JsonArray(url.Server);
         AddParameters(operation, request, path, variables, parameterNames);
         AddBody(operation, request["body"] as JsonObject, HeaderValue(request["header"], "Content-Type"));
-        AddResponses(operation, item["response"] as JsonArray, method);
+        AddResponses(operation, ReadResponseExamples(item, request, operation), method);
         ApplySecurity(operation, auth, request["header"], variables);
         if (folders.Count > 0)
         {

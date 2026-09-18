@@ -16,4 +16,11 @@ public sealed class PostmanConversionOptions
     /// including a request with no URL. Otherwise URL-less source items are preserved in x-postman-unmapped-requests.
     /// </summary>
     public bool FailOnWarnings { get; init; }
+
+    /// <summary>
+    /// Treats an unclassified saved JSON response body as an inferred 2XX response when no error indicators are present.
+    /// The original default response is retained, and a warning records the assumption. Disable to require status evidence.
+    /// Explicit status codes, response names, and documented status information take precedence.
+    /// </summary>
+    public bool InferSuccessResponsesFromBodies { get; init; } = true;
 }

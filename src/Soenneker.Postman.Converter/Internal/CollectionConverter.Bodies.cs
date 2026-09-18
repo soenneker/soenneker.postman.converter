@@ -195,13 +195,10 @@ internal sealed partial class CollectionConverter
         foreach (JsonObject example in examples?.OfType<JsonObject>() ?? [])
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string code = Text(example["code"]) ?? "default";
-            if (code != "default" && (!int.TryParse(code, out int status) || status < 100 || status > 599))
-            {
-                Warn(operation, $"Saved response status '{code}' is not an HTTP status; preserved as a default response.");
-                code = "default";
-            }
+            string code = ResolveResponseCode(example, operation, out string? inference);
             var response = new JsonObject { ["description"] = Text(example["status"]) ?? Text(example["name"]) ?? "Saved response" };
+            if (inference != null)
+                response["x-postman-response-inference"] = inference;
             var headers = new JsonObject();
             foreach (JsonObject header in Headers(example["header"]))
             {
@@ -233,6 +230,14 @@ internal sealed partial class CollectionConverter
                 MergeResponse(existing, response);
             else
                 responses[code] = response;
+            if (inference == "unclassified-json-body")
+            {
+                // Preserve uncertainty about the status as well as exposing the observed payload to generators.
+                if (responses["default"] is JsonObject fallback)
+                    MergeResponse(fallback, response);
+                else
+                    responses["default"] = response.DeepClone();
+            }
         }
         if (responses.Count == 0)
         {
@@ -294,7 +299,11 @@ internal sealed partial class CollectionConverter
                 System.Globalization.CultureInfo.InvariantCulture, out _) ? "integer" : "number",
             _ => "string"
         };
-        return new JsonObject { ["type"] = type };
+        var result = new JsonObject { ["type"] = type };
+        if (type == "integer" && System.Numerics.BigInteger.TryParse(node.ToJsonString(), out var integer) &&
+            integer >= long.MinValue && integer <= long.MaxValue)
+            result["format"] = "int64";
+        return result;
     }
 
     private static JsonObject MergeSchema(JsonObject left, JsonObject right)
@@ -324,6 +333,8 @@ internal sealed partial class CollectionConverter
         if (type != null && type == Text(right["type"]))
         {
             var merged = (JsonObject)left.DeepClone();
+            if (type == "integer" && Text(left["format"]) != Text(right["format"]))
+                merged.Remove("format"); // An observed arbitrary-precision integer must not be narrowed to Int64.
             if (Text(right["nullable"])?.Equals("true", StringComparison.OrdinalIgnoreCase) == true)
                 merged["nullable"] = true;
             if (type == "object")

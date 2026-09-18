@@ -80,6 +80,12 @@ The converter supports raw and structured URLs, collection API wrappers, string 
 | Folder hierarchy and descriptions | Tags with folder paths and descriptions |
 | Multiple requests with the same method and path | One combined operation with every original request in `x-postman-variants` |
 
+### Response recovery
+
+Saved response bodies produce schemas, including `int64` for observed integers that fit in 64 bits. If a saved response omits its HTTP code, the converter checks its status text and name (for example, `identityMe-200`), then an unambiguous documented success status. Fenced JSON under an explicitly labeled response section is also included; request examples are never used as response examples.
+
+When a JSON object or array has no status evidence and no error indicators, `InferSuccessResponsesFromBodies` (enabled by default) exposes its schema as an inferred `2XX` response and keeps the original `default` response. Warnings and `x-postman-response-inference` record the assumption. Set the option to `false` to require status evidence. Explicit error statuses and error-like bodies are not promoted to success. Operations with no usable response information retain their unspecified response; they may still generate a `Stream` return type.
+
 ### Environment values
 
 Collection exports often omit the environment needed to resolve their server URLs. Supply those values explicitly:

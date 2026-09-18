@@ -474,6 +474,64 @@ public sealed class ConversionFidelityTests : HostedUnitTest
         await conversion.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Angle-bracket placeholder*webhook id*");
     }
 
+    [Test]
+    public async Task Response_status_evidence_precedes_body_inference_and_errors_remain_errors(CancellationToken cancellationToken)
+    {
+        JsonObject document = await Convert(Collection("""
+            {"name":"Identity","request":{"url":"https://example.com/identity"},"response":[{"name":"identityMe-200","body":"{\"lastRefreshedAt\":1760631246905}"}]},
+            {"name":"Created","request":{"url":"https://example.com/created"},"response":[{"status":"Created","body":"{\"id\":1}"}]},
+            {"name":"Explicit error","request":{"url":"https://example.com/error"},"response":[{"code":403,"name":"200 success","body":"{\"id\":1}"}]},
+            {"name":"Unknown error","request":{"url":"https://example.com/unknown-error"},"response":[{"body":"{\"message\":\"Denied\",\"status\":403}"}]},
+            {"name":"Unclassified","request":{"url":"https://example.com/inferred"},"response":[{"body":"{\"value\":{\"id\":1}}"}]}
+            """), cancellationToken);
+        String(Operation(document, "/identity")["responses"]!["200"]!["content"]!["application/json"]!["schema"]!["properties"]!["lastRefreshedAt"]!["format"]).Should().Be("int64");
+        Operation(document, "/created")["responses"]!["201"].Should().NotBeNull();
+        ((JsonObject)Operation(document, "/error")["responses"]!).Select(pair => pair.Key).Should().BeEquivalentTo("403");
+        ((JsonObject)Operation(document, "/unknown-error")["responses"]!).Select(pair => pair.Key).Should().BeEquivalentTo("default");
+        JsonNode inferred = Operation(document, "/inferred")["responses"]!;
+        inferred["default"].Should().NotBeNull();
+        String(inferred["2XX"]!["x-postman-response-inference"]).Should().Be("unclassified-json-body");
+    }
+
+    [Test]
+    public async Task Unknown_success_inference_can_be_disabled(CancellationToken cancellationToken)
+    {
+        JsonObject document = await Convert(Collection("""
+            {"request":{"url":"https://example.com/value"},"response":[{"body":"{\"value\":1}"}]}
+            """), cancellationToken, new PostmanConversionOptions { InferSuccessResponsesFromBodies = false });
+        ((JsonObject)Operation(document, "/value")["responses"]!).Select(pair => pair.Key).Should().BeEquivalentTo("default");
+    }
+
+    [Test]
+    public async Task Documented_status_attaches_to_unclassified_bodies_but_does_not_promote_errors(CancellationToken cancellationToken)
+    {
+        JsonObject document = await Convert(Collection("""
+            {"request":{"url":"https://example.com/created","description":"A successful response returns 201 Created."},"response":[
+              {"name":"Result","body":"{\"id\":1}"},
+              {"name":"Error","body":"{\"error\":\"invalid\"}"}
+            ]}
+            """), cancellationToken, new PostmanConversionOptions { InferSuccessResponsesFromBodies = false });
+        JsonNode responses = Operation(document, "/created")["responses"]!;
+        responses["201"]!["content"]!["application/json"]!["schema"]!["properties"]!["id"].Should().NotBeNull();
+        responses["default"]!["content"]!["application/json"]!["schema"]!["properties"]!["error"].Should().NotBeNull();
+        responses["2XX"].Should().BeNull();
+    }
+
+    [Test]
+    public async Task Documented_response_examples_are_recovered_without_using_request_examples(CancellationToken cancellationToken)
+    {
+        JsonObject document = await Convert(Collection("""
+            {"request":{"url":"https://example.com/documented","description":"### Sample Request\n```json\n{\"requestOnly\":true}\n```\n### Sample Response 200\n```json\n{\"elements\":[{\"at\":1648512200000},],}\n```\n### Other\n```json\n{\"unrelated\":true}\n```"}},
+            {"request":{"url":"https://example.com/deleted","description":"A successful response returns 204 No Content."}}
+            """), cancellationToken);
+        JsonNode schema = Operation(document, "/documented")["responses"]!["200"]!["content"]!["application/json"]!["schema"]!;
+        schema["properties"]!["requestOnly"].Should().BeNull();
+        schema["properties"]!["unrelated"].Should().BeNull();
+        String(schema["properties"]!["elements"]!["items"]!["properties"]!["at"]!["format"]).Should().Be("int64");
+        Operation(document, "/deleted")["responses"]!["204"].Should().NotBeNull();
+        Operation(document, "/deleted")["responses"]!["204"]!["content"].Should().BeNull();
+    }
+
     private async Task<JsonObject> Convert(string source, CancellationToken cancellationToken, PostmanConversionOptions? options = null)
     {
         OpenApiDocument document = await _converter.Convert(source, options ?? new PostmanConversionOptions(), cancellationToken);
