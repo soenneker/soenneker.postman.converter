@@ -6,7 +6,7 @@
 
 # Soenneker.Postman.Converter
 
-Converts Postman collection JSON into an OpenAPI v3 document or JSON file.
+Converts Postman v2.0/v2.1 collection JSON into OpenAPI 3.0 documents and JSON files, preserving source requests, examples, and conversion diagnostics.
 
 ## Installation
 
@@ -67,6 +67,78 @@ await converter.SaveOpenApiUrl(
 
 ## Conversion behavior
 
-The converter maps nested folders to tags, collection variables to server/path values, request headers and bodies to operation inputs, saved examples to response schemas, and supported Postman authentication metadata to OpenAPI security schemes. Unsupported HTTP methods fail explicitly instead of being emitted as a different operation.
+The converter supports raw and structured URLs, collection API wrappers, string requests, nested folders, scoped variables, and Postman v2.0 object or v2.1 array authentication settings.
 
-Postman scripts, test assertions, and runtime behavior are not executable OpenAPI concepts and are not carried into the output. Review the generated document before using it for client generation or publishing.
+| Collection information | OpenAPI representation |
+| --- | --- |
+| Absolute URLs, ports, base URL variables, multiple hosts | Operation servers; unresolved origins remain named server variables with warnings |
+| `:id`, `{{id}}`, embedded variables in compound identifiers | Required path parameters, including URL-variable descriptions and examples; encoded literal path text is preserved |
+| Structured or raw query strings, headers, cookies | Parameters with string examples; repeated query keys use arrays with form/explode serialization; disabled entries are excluded |
+| Raw JSON, text, XML, HTML, URL-encoded forms, multipart uploads, binary files, GraphQL | Request media types, schemas, encoding, and examples |
+| Saved responses | Status codes, media types, headers, named examples, and schemas combined across every saved example |
+| Basic, bearer, digest, API key, OAuth2 authentication | Inherited or overridden security requirements and distinct registered schemes; API keys support query and header locations |
+| Folder hierarchy and descriptions | Tags with folder paths and descriptions |
+| Multiple requests with the same method and path | One combined operation with every original request in `x-postman-variants` |
+
+### Environment values
+
+Collection exports often omit the environment needed to resolve their server URLs. Supply those values explicitly:
+
+```csharp
+using Soenneker.Postman.Converter.Options;
+
+var options = new PostmanConversionOptions
+{
+    Variables = new Dictionary<string, string?>
+    {
+        ["baseUrl"] = "https://api.example.com/rest"
+    }
+};
+
+OpenApiDocument document = await converter.ConvertUrl(
+    collectionUrl, options, cancellationToken);
+
+await File.WriteAllTextAsync(
+    "openapi.json", converter.ToJson(document), cancellationToken);
+```
+
+`Convert`, `ConvertFile`, and `ConvertUrl` have options overloads. Existing overloads remain available. Overrides take precedence over collection and folder values; names are case-sensitive. Nested URL variables are resolved with cycle detection. URL prefixes become servers, while path placeholders remain parameters. Body and query examples retain their source values rather than being rewritten with environment credentials.
+
+### Inference and fidelity
+
+A collection describes example requests, not the complete endpoint contract. The converter keeps this distinction explicit:
+
+- JSON strings stay strings, including `"001"` and `"true"`. Property names are preserved exactly. Schemas inspect every array element and combine observed shapes with `anyOf` where needed.
+- Example fields and request bodies are not assumed required. Query, header, and form values remain strings because their wire values do not prove an endpoint's logical type. Path parameters are required by OpenAPI.
+- Null-only values and empty arrays do not establish a type. Unquoted Postman body variables remain unconstrained. Nonstandard or invalid JSON is preserved in `x-postman-raw-body` with diagnostics; it is not relabeled as a JSON string payload.
+- Missing saved responses produce a documented `default` response, not an invented successful status or response schema. `Accept` does not establish a response's actual media type.
+- Configured OAuth scopes are listed on the security scheme, but are not declared mandatory for every endpoint. Incomplete OAuth configuration falls back to bearer transport with a warning. Unsupported authentication remains visible in source metadata and warnings.
+- OpenAPI has one operation per method/path. When use cases differ by query selectors, headers, host, or body shape, their inputs and responses are combined. This cannot express all correlations between those choices. `x-postman-variants` retains each original request, response list, effective authentication, and folder path for inspection. Equivalent path templates use the first parameter spelling.
+- Scripts are not executed and their runtime effects are not inferred. Collection events and variables are retained in `x-postman-events` and `x-postman-variables`; request events and protocol settings are retained with source variants. Folder scripts and unsupported protocol behavior generate warnings.
+
+Document and operation `x-postman-warnings` extensions describe missing information, unsupported features, inferred OAuth flows, and merged operations. Set `FailOnWarnings = true` to reject a conversion with any such diagnostic. A warning-free conversion still cannot establish undocumented validation rules, error responses, or runtime behavior.
+
+Source extensions and examples contain original collection data, including authentication configuration when present. Treat the generated file with the same confidentiality as the input collection.
+
+Unsupported HTTP methods and malformed request structures fail explicitly. To establish a complete production contract, supplement the collection with authoritative endpoint documentation or observed responses; conversion alone cannot prove endpoint behavior.
+
+### Regression coverage
+
+The offline regression fixture is the supplied LinkedIn Campaign Management collection: 72 requests, 25 generated paths, and 42 combined operations. It has no saved responses, unresolved environment/upload URLs, and a request containing `{{baseUrl}}adAccounts` without a separator. The converter preserves these facts and reports them instead of silently guessing fixes.
+
+Run tests with Microsoft Testing Platform:
+
+```powershell
+dotnet test --project test/Soenneker.Postman.Converter.Tests -- --treenode-filter "/*/*/*/*"
+```
+
+For an independent document and example validation pass, export regression outputs into a fresh directory and run the included Python validator. This optional check needs `openapi-spec-validator`, which also installs `openapi-schema-validator`:
+
+```powershell
+$env:POSTMAN_CONVERTER_VALIDATION_DIR = Join-Path $PWD "artifacts/validation"
+dotnet test --project test/Soenneker.Postman.Converter.Tests -- --treenode-filter "/*/*/ConversionFidelityTests/*"
+python -m pip install openapi-spec-validator
+python test/validate_generated_openapi.py artifacts/validation
+```
+
+Tests read the collection snapshot locally; they do not execute its requests or contact LinkedIn.

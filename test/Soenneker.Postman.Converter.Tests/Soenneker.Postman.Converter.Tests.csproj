@@ -11,6 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <None Update="Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
         <Content Include="appsettings.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

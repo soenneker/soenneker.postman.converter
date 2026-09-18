@@ -1,4 +1,5 @@
 using Microsoft.OpenApi;
+using Soenneker.Postman.Converter.Options;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,6 +18,13 @@ public interface IPostmanConverter
     /// <returns>The converted OpenAPI document.</returns>
     ValueTask<OpenApiDocument> Convert(string postmanJson, CancellationToken cancellationToken = default);
 
+    /// <summary>Converts collection JSON with environment overrides and optional strict diagnostics.</summary>
+    /// <param name="postmanJson">A Postman v2.0 or v2.1 collection, optionally wrapped in a collection property.</param>
+    /// <param name="options">Variable overrides and diagnostic behavior.</param>
+    /// <param name="cancellationToken">Token used to cancel conversion.</param>
+    /// <returns>An OpenAPI v3 document with source variants and conversion warnings in extensions.</returns>
+    ValueTask<OpenApiDocument> Convert(string postmanJson, PostmanConversionOptions options, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Converts a Postman collection JSON payload into an OpenAPI v3 JSON string.
     /// </summary>
@@ -33,6 +41,13 @@ public interface IPostmanConverter
     /// <returns>The converted OpenAPI document.</returns>
     ValueTask<OpenApiDocument> ConvertUrl(string url, CancellationToken cancellationToken = default);
 
+    /// <summary>Downloads and converts a collection using variable overrides and diagnostic options.</summary>
+    /// <param name="url">The URL of a collection JSON document.</param>
+    /// <param name="options">Variable overrides and diagnostic behavior.</param>
+    /// <param name="cancellationToken">Token used to cancel download or conversion.</param>
+    /// <returns>The converted OpenAPI document.</returns>
+    ValueTask<OpenApiDocument> ConvertUrl(string url, PostmanConversionOptions options, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Downloads a Postman collection from a URL and converts it into an OpenAPI v3 JSON string.
     /// </summary>
@@ -48,6 +63,13 @@ public interface IPostmanConverter
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>The converted OpenAPI document.</returns>
     ValueTask<OpenApiDocument> ConvertFile(string filePath, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads and converts a collection using variable overrides and diagnostic options.</summary>
+    /// <param name="filePath">The collection JSON file.</param>
+    /// <param name="options">Variable overrides and diagnostic behavior.</param>
+    /// <param name="cancellationToken">Token used to cancel reading or conversion.</param>
+    /// <returns>The converted OpenAPI document.</returns>
+    ValueTask<OpenApiDocument> ConvertFile(string filePath, PostmanConversionOptions options, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Reads a Postman collection file and converts it into an OpenAPI v3 JSON string.
