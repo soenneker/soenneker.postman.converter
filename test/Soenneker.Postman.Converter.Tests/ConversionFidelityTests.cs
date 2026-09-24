@@ -1,3 +1,4 @@
+using Soenneker.Utils.File.Abstract;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -20,17 +21,20 @@ namespace Soenneker.Postman.Converter.Tests;
 [ClassDataSource<Host>(Shared = SharedType.PerTestSession)]
 public sealed class ConversionFidelityTests : HostedUnitTest
 {
+    private readonly IFileUtil _fileUtil;
+
     private readonly IPostmanConverter _converter;
 
     public ConversionFidelityTests(Host host) : base(host)
     {
+        _fileUtil = Resolve<IFileUtil>(true);
         _converter = Resolve<IPostmanConverter>(true);
     }
 
     [Test]
     public async Task LinkedIn_collection_preserves_every_source_request_and_describes_its_limitations(CancellationToken cancellationToken)
     {
-        string source = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "linkedin-campaign-management.postman.json"), cancellationToken);
+        string source = await _fileUtil.Read(Path.Combine(AppContext.BaseDirectory, "Fixtures", "linkedin-campaign-management.postman.json"), cancellationToken: cancellationToken);
         JsonObject document = await Convert(source, cancellationToken);
         JsonObject[] operations = Operations(document).ToArray();
         JsonObject[] variants = operations.SelectMany(op => ((JsonArray)op["x-postman-variants"]!).OfType<JsonObject>()).ToArray();
@@ -52,7 +56,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
         JsonObject compound = operations.First(op => String(op["summary"]) == "Create Ad Account User");
         Parameters(compound).Where(p => String(p["in"]) == "path").Select(p => String(p["name"])).Should().BeEquivalentTo("sponsoredaccount_id", "person_id");
         operations.Should().Contain(op => Parameters(op).Any(p => String(p["name"]) == "q"));
-        await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "campaign-management.openapi.json"), document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
+        await _fileUtil.Write(Path.Combine(AppContext.BaseDirectory, "campaign-management.openapi.json"), document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), cancellationToken: cancellationToken);
     }
 
     [Test]
@@ -301,10 +305,10 @@ public sealed class ConversionFidelityTests : HostedUnitTest
         {
             // Exercise the same default file entry point used by the LinkedIn runner.
             await _converter.SaveOpenApiFile(input, output, cancellationToken);
-            string json = await File.ReadAllTextAsync(output, cancellationToken);
+            string json = await _fileUtil.Read(output, cancellationToken: cancellationToken);
             OpenApiDocument.Parse(json, "json").Diagnostic!.Errors.Should().BeEmpty();
             var document = (JsonObject)JsonNode.Parse(json)!;
-            JsonObject[] sources = Requests((JsonArray)JsonNode.Parse(await File.ReadAllTextAsync(input, cancellationToken))!["item"]!).ToArray();
+            JsonObject[] sources = Requests((JsonArray)JsonNode.Parse(await _fileUtil.Read(input, cancellationToken: cancellationToken))!["item"]!).ToArray();
             sources.Length.Should().Be(55);
             JsonObject[] mapped = Operations(document).SelectMany(op => ((JsonArray)op["x-postman-variants"]!).OfType<JsonObject>()).ToArray();
             mapped.Length.Should().Be(54);
@@ -321,7 +325,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
         }
         finally
         {
-            File.Delete(output);
+            await _fileUtil.Delete(output);
         }
     }
 
@@ -542,7 +546,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
         {
             Directory.CreateDirectory(outputDirectory);
             string hash = System.Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
-            await File.WriteAllTextAsync(Path.Combine(outputDirectory, hash + ".json"), json, cancellationToken);
+            await _fileUtil.Write(Path.Combine(outputDirectory, hash + ".json"), json, cancellationToken: cancellationToken);
         }
         return (JsonObject)JsonNode.Parse(json)!;
     }
