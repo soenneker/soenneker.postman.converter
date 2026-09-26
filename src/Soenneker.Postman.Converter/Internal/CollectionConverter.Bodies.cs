@@ -161,7 +161,7 @@ internal sealed partial class CollectionConverter
                 {
                     if (example[key] is not JsonArray repeated)
                         example[key] = repeated = new JsonArray(example[key]?.DeepClone());
-                    repeated.Add(Text(field["value"]) ?? "");
+                    repeated.Add((JsonNode?)Text(field["value"]) ?? "");
                 }
             }
             else

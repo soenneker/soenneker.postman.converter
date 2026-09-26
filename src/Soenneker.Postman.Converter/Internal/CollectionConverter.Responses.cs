@@ -118,13 +118,13 @@ internal sealed partial class CollectionConverter
                 var example = new JsonObject { ["name"] = "Documented response", ["body"] = body, ["x-postman-response-inference"] = "description-response-example" };
                 if (sectionCode != null) example["code"] = sectionCode;
                 else if (documentedSuccessCodes.Length == 1) example["x-postman-documented-success-status"] = documentedSuccessCodes[0];
-                result.Add(example);
+                result.Add((JsonNode?)example);
                 Warn(operation, "A JSON example from a documented response section was included in the response contract.");
             }
             foreach (string code in documentedSuccessCodes)
             {
                 if (!result.OfType<JsonObject>().Any(example => Text(example["code"]) == code))
-                    result.Add(new JsonObject { ["code"] = code, ["name"] = "Documented success response", ["x-postman-response-inference"] = "description-status" });
+                    result.Add((JsonNode?)new JsonObject { ["code"] = code, ["name"] = "Documented success response", ["x-postman-response-inference"] = "description-status" });
             }
         }
         return result;

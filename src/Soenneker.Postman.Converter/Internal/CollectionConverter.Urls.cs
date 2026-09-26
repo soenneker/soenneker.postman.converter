@@ -131,7 +131,7 @@ internal sealed partial class CollectionConverter
             string? example = _variableOverrides.GetValueOrDefault(original) ?? variable?.Value;
             if (!string.IsNullOrEmpty(example))
                 AddExample(parameter, JsonValue.Create(example));
-            parameters.Add(parameter);
+            parameters.Add((JsonNode?)parameter);
         }
 
         JsonArray queries = url?["query"] as JsonArray ?? ParseRawQuery(url == null ? Text(request["url"]) : Text(url["raw"]));
@@ -188,7 +188,7 @@ internal sealed partial class CollectionConverter
         JsonObject? existing = parameters.OfType<JsonObject>().FirstOrDefault(item => ParameterKey(item) == ParameterKey(parameter));
         if (existing == null)
         {
-            parameters.Add(parameter);
+            parameters.Add((JsonNode?)parameter);
             return;
         }
         if (repeated)
@@ -217,7 +217,7 @@ internal sealed partial class CollectionConverter
         foreach (string part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             string[] pair = part.Split('=', 2);
-            result.Add(new JsonObject { ["key"] = DecodeQuery(pair[0]), ["value"] = pair.Length == 2 ? DecodeQuery(pair[1]) : "" });
+            result.Add((JsonNode?)new JsonObject { ["key"] = DecodeQuery(pair[0]), ["value"] = pair.Length == 2 ? DecodeQuery(pair[1]) : "" });
         }
         return result;
     }

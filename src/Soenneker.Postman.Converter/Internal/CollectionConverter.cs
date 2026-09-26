@@ -97,7 +97,7 @@ internal sealed partial class CollectionConverter(PostmanConversionOptions optio
         var parsedUrl = ReadUrl(request["url"], variables, operation);
         if (parsedUrl == null)
         {
-            _unmappedRequests.Add(new JsonObject
+            _unmappedRequests.Add((JsonNode?)new JsonObject
             {
                 ["reason"] = "missing-url",
                 ["item"] = item.DeepClone(),
@@ -138,7 +138,7 @@ internal sealed partial class CollectionConverter(PostmanConversionOptions optio
                 var tagObject = new JsonObject { ["name"] = tag };
                 if (folderDescription != null)
                     tagObject["description"] = folderDescription;
-                _tags.Add(tagObject);
+                _tags.Add((JsonNode?)tagObject);
             }
             operation["tags"] = new JsonArray(JsonValue.Create(tag));
         }
@@ -215,13 +215,13 @@ internal sealed partial class CollectionConverter(PostmanConversionOptions optio
         if (options.FailOnWarnings)
             throw new InvalidOperationException(contextual);
         if (!_warnings.Any(node => Text(node) == contextual))
-            _warnings.Add(contextual);
+            _warnings.Add((JsonNode?)contextual);
         if (operation != null)
         {
             if (operation["x-postman-warnings"] is not JsonArray warnings)
                 operation["x-postman-warnings"] = warnings = [];
             if (!warnings.Any(node => Text(node) == message))
-                warnings.Add(message);
+                warnings.Add((JsonNode?)message);
         }
     }
 
