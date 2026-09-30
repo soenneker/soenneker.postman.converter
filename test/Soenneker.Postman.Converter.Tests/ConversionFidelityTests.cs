@@ -32,7 +32,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task LinkedIn_collection_preserves_every_source_request_and_describes_its_limitations(CancellationToken cancellationToken)
+    public async ValueTask LinkedIn_collection_preserves_every_source_request_and_describes_its_limitations(CancellationToken cancellationToken)
     {
         string source = await _fileUtil.Read(Path.Combine(AppContext.BaseDirectory, "Fixtures", "linkedin-campaign-management.postman.json"), cancellationToken: cancellationToken);
         JsonObject document = await Convert(source, cancellationToken);
@@ -60,7 +60,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Raw_urls_preserve_encoded_compound_paths_ports_query_values_and_repeated_parameters(CancellationToken cancellationToken)
+    public async ValueTask Raw_urls_preserve_encoded_compound_paths_ports_query_values_and_repeated_parameters(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Compound","request":{"url":"https://api.example.com:8443/v1/(account:urn%3Ali%3A{{account}},user:{{user}})?q=search&ids=001&ids=002&filter=a%2Bb+c#ignored"}}
@@ -75,7 +75,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Structured_urls_and_scoped_variables_preserve_server_prefixes_and_path_descriptions(CancellationToken cancellationToken)
+    public async ValueTask Structured_urls_and_scoped_variables_preserve_server_prefixes_and_path_descriptions(CancellationToken cancellationToken)
     {
         const string source = """
             {"info":{"name":"Scoped","description":{"content":"Collection docs"},"version":{"major":2,"minor":3,"patch":4}},
@@ -99,7 +99,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Json_schemas_preserve_strings_property_names_nulls_and_all_array_elements_without_inventing_required_fields(CancellationToken cancellationToken)
+    public async ValueTask Json_schemas_preserve_strings_property_names_nulls_and_all_array_elements_without_inventing_required_fields(CancellationToken cancellationToken)
     {
         const string body = """{"code":"001","truth":"true","integer":4,"decimal":1.25,"flag":false," odd\\\" ":"value","nullOnly":null,"items":[{"a":1,"optional":null},{"b":"2","optional":"yes"}],"mixed":[1,"two",false,null],"empty":[]}""";
         JsonObject document = await Convert(Collection(RequestWithBody("raw", JsonValue.Create(body))), cancellationToken);
@@ -120,7 +120,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Duplicate_operations_merge_request_variants_responses_servers_and_examples(CancellationToken cancellationToken)
+    public async ValueTask Duplicate_operations_merge_request_variants_responses_servers_and_examples(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Create","request":{"method":"POST","url":"https://one.example.com/items?action=create","body":{"mode":"raw","raw":"{\"name\":\"first\"}"}},"response":[{"code":201,"name":"Created","body":"{\"id\":1}"}]},
@@ -136,7 +136,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Same_status_responses_merge_media_types_shapes_headers_and_named_examples(CancellationToken cancellationToken)
+    public async ValueTask Same_status_responses_merge_media_types_shapes_headers_and_named_examples(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Read","request":{"url":"https://example.com/test","header":[{"key":"Accept","value":"application/xml"}]},"response":[
@@ -156,7 +156,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Multipart_forms_preserve_files_repeated_fields_encoding_and_disabled_entries(CancellationToken cancellationToken)
+    public async ValueTask Multipart_forms_preserve_files_repeated_fields_encoding_and_disabled_entries(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Upload","request":{"method":"POST","url":"https://example.com/test","body":{"mode":"formdata","formdata":[
@@ -173,7 +173,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Urlencoded_binary_graphql_and_raw_text_bodies_have_correct_media_types(CancellationToken cancellationToken)
+    public async ValueTask Urlencoded_binary_graphql_and_raw_text_bodies_have_correct_media_types(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Form","request":{"method":"POST","url":"https://example.com/form","body":{"mode":"urlencoded","urlencoded":[{"key":"code","value":"001"}]}}},
@@ -188,7 +188,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Authentication_inherits_overrides_and_registers_distinct_query_and_header_keys(CancellationToken cancellationToken)
+    public async ValueTask Authentication_inherits_overrides_and_registers_distinct_query_and_header_keys(CancellationToken cancellationToken)
     {
         const string source = """
             {"info":{"name":"Auth"},"auth":{"type":"bearer","bearer":[{"key":"token","value":"{{token}}"}]},"item":[
@@ -213,7 +213,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task OAuth_v21_maps_complete_flow_and_scopes_without_emitting_credentials(CancellationToken cancellationToken)
+    public async ValueTask OAuth_v21_maps_complete_flow_and_scopes_without_emitting_credentials(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"OAuth","request":{"url":"https://example.com/test","auth":{"type":"oauth2","oauth2":[
@@ -227,7 +227,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Unquoted_json_variables_keep_known_structure_and_do_not_create_invalid_examples(CancellationToken cancellationToken)
+    public async ValueTask Unquoted_json_variables_keep_known_structure_and_do_not_create_invalid_examples(CancellationToken cancellationToken)
     {
         string body = """{"count":{{count}},"code":"{{code}}","enabled":true}""";
         JsonObject document = await Convert(Collection(RequestWithBody("raw", JsonValue.Create(body))), cancellationToken);
@@ -241,7 +241,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Equivalent_path_templates_merge_without_duplicate_paths(CancellationToken cancellationToken)
+    public async ValueTask Equivalent_path_templates_merge_without_duplicate_paths(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"First","request":{"url":"https://example.com/things/{{id}}"}},
@@ -254,7 +254,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Missing_servers_and_cyclic_variables_remain_explicit_and_strict_mode_rejects_ambiguity(CancellationToken cancellationToken)
+    public async ValueTask Missing_servers_and_cyclic_variables_remain_explicit_and_strict_mode_rejects_ambiguity(CancellationToken cancellationToken)
     {
         string source = Collection("""{"name":"Unknown","request":{"url":"{{baseUrl}}/test"}}""");
         JsonObject document = await Convert(source, cancellationToken, new PostmanConversionOptions
@@ -269,7 +269,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task String_requests_wrappers_disabled_headers_and_cookies_are_supported(CancellationToken cancellationToken)
+    public async ValueTask String_requests_wrappers_disabled_headers_and_cookies_are_supported(CancellationToken cancellationToken)
     {
         string source = "{\"collection\":" + Collection("""
             {"name":"String","request":"https://example.com/string?q=001"},
@@ -286,7 +286,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Cancellation_and_malformed_request_structures_fail_explicitly(CancellationToken cancellationToken)
+    public async ValueTask Cancellation_and_malformed_request_structures_fail_explicitly(CancellationToken cancellationToken)
     {
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
@@ -297,7 +297,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Content_apis_file_conversion_preserves_unmapped_request_and_converts_all_other_requests(CancellationToken cancellationToken)
+    public async ValueTask Content_apis_file_conversion_preserves_unmapped_request_and_converts_all_other_requests(CancellationToken cancellationToken)
     {
         string input = Path.Combine(AppContext.BaseDirectory, "Fixtures", "linkedin-content-apis.postman.json");
         string output = Path.GetTempFileName();
@@ -330,7 +330,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Empty_urls_are_preserved_without_inventing_endpoints_or_consuming_operation_ids(CancellationToken cancellationToken)
+    public async ValueTask Empty_urls_are_preserved_without_inventing_endpoints_or_consuming_operation_ids(CancellationToken cancellationToken)
     {
         foreach (string url in new[] { "null", "\"\"", "\"  \"", "{}", "{\"raw\":\"\"}", "{\"host\":[]}", "{\"path\":[]}", "{\"query\":[{\"key\":\"q\",\"value\":\"x\"}]}" })
         {
@@ -343,7 +343,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Missing_urls_still_fail_in_strict_mode(CancellationToken cancellationToken)
+    public async ValueTask Missing_urls_still_fail_in_strict_mode(CancellationToken cancellationToken)
     {
         Func<Task> conversion = () => _converter.Convert(Collection("""{"name":"Incomplete","request":{"method":"GET"}}"""),
             new PostmanConversionOptions { FailOnWarnings = true }, cancellationToken).AsTask();
@@ -351,7 +351,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Explicit_root_paths_remain_valid_and_have_no_unmapped_extension(CancellationToken cancellationToken)
+    public async ValueTask Explicit_root_paths_remain_valid_and_have_no_unmapped_extension(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Root","request":{"url":{"path":"/"}}},
@@ -363,7 +363,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Partial_structured_urls_keep_raw_paths_and_variable_names_are_case_sensitive(CancellationToken cancellationToken)
+    public async ValueTask Partial_structured_urls_keep_raw_paths_and_variable_names_are_case_sensitive(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Partial","request":{"url":{"raw":"https://example.com/actual?q=1","host":["example","com"],"protocol":"https"}}},
@@ -379,7 +379,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Unknown_template_values_remain_unconstrained_when_merged_with_concrete_examples(CancellationToken cancellationToken)
+    public async ValueTask Unknown_template_values_remain_unconstrained_when_merged_with_concrete_examples(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Template","request":{"method":"POST","url":"https://example.com/test","body":{"mode":"raw","raw":"{\"value\":{{value}}}"}}},
@@ -392,7 +392,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Invalid_json_and_unsupported_features_are_diagnosed_without_fabricating_contracts(CancellationToken cancellationToken)
+    public async ValueTask Invalid_json_and_unsupported_features_are_diagnosed_without_fabricating_contracts(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Invalid","request":{"method":"POST","url":"https://example.com/invalid","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{ invalid json"}}},
@@ -407,7 +407,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Disabled_content_type_headers_do_not_override_body_language_and_raw_header_strings_work(CancellationToken cancellationToken)
+    public async ValueTask Disabled_content_type_headers_do_not_override_body_language_and_raw_header_strings_work(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Body","request":{"method":"POST","url":"https://example.com/test","header":[{"key":"Content-Type","value":"text/plain","disabled":true}],"body":{"mode":"raw","raw":"{\"code\":\"01\"}","options":{"raw":{"language":"json"}}}}},
@@ -420,7 +420,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Strict_mode_accepts_a_self_contained_request_with_a_saved_response(CancellationToken cancellationToken)
+    public async ValueTask Strict_mode_accepts_a_self_contained_request_with_a_saved_response(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Known","request":{"url":"https://example.com/known"},"response":[{"code":200,"status":"OK","body":"{\"ok\":true}"}]}
@@ -431,7 +431,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task Angle_bracket_placeholders_become_required_path_parameters(bool structured, CancellationToken cancellationToken)
+    public async ValueTask Angle_bracket_placeholders_become_required_path_parameters(bool structured, CancellationToken cancellationToken)
     {
         const string raw = "{{baseUrl}}/leadnotifications/<webhook id>";
         JsonNode url = structured ? new JsonObject
@@ -458,7 +458,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Angle_bracket_conversion_preserves_encoded_literals_existing_templates_and_query_values(CancellationToken cancellationToken)
+    public async ValueTask Angle_bracket_conversion_preserves_encoded_literals_existing_templates_and_query_values(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Mixed","request":{"url":"https://example.com/%3Cencoded%20literal%3E/{existing<name>}/(id:<first>,other:<second>)?q=<query>"}}
@@ -470,7 +470,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Strict_mode_reports_inferred_angle_bracket_parameters(CancellationToken cancellationToken)
+    public async ValueTask Strict_mode_reports_inferred_angle_bracket_parameters(CancellationToken cancellationToken)
     {
         Func<Task> conversion = () => _converter.Convert(Collection("""
             {"name":"Delete webhook","request":{"url":"https://example.com/leadnotifications/<webhook id>"}}
@@ -479,7 +479,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Response_status_evidence_precedes_body_inference_and_errors_remain_errors(CancellationToken cancellationToken)
+    public async ValueTask Response_status_evidence_precedes_body_inference_and_errors_remain_errors(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"name":"Identity","request":{"url":"https://example.com/identity"},"response":[{"name":"identityMe-200","body":"{\"lastRefreshedAt\":1760631246905}"}]},
@@ -498,7 +498,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Unknown_success_inference_can_be_disabled(CancellationToken cancellationToken)
+    public async ValueTask Unknown_success_inference_can_be_disabled(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"request":{"url":"https://example.com/value"},"response":[{"body":"{\"value\":1}"}]}
@@ -507,7 +507,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Documented_status_attaches_to_unclassified_bodies_but_does_not_promote_errors(CancellationToken cancellationToken)
+    public async ValueTask Documented_status_attaches_to_unclassified_bodies_but_does_not_promote_errors(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"request":{"url":"https://example.com/created","description":"A successful response returns 201 Created."},"response":[
@@ -522,7 +522,7 @@ public sealed class ConversionFidelityTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Documented_response_examples_are_recovered_without_using_request_examples(CancellationToken cancellationToken)
+    public async ValueTask Documented_response_examples_are_recovered_without_using_request_examples(CancellationToken cancellationToken)
     {
         JsonObject document = await Convert(Collection("""
             {"request":{"url":"https://example.com/documented","description":"### Sample Request\n```json\n{\"requestOnly\":true}\n```\n### Sample Response 200\n```json\n{\"elements\":[{\"at\":1648512200000},],}\n```\n### Other\n```json\n{\"unrelated\":true}\n```"}},

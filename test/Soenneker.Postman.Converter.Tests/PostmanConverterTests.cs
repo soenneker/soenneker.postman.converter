@@ -21,7 +21,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Concurrent_conversions_keep_operation_ids_isolated(CancellationToken cancellationToken)
+    public async ValueTask Concurrent_conversions_keep_operation_ids_isolated(CancellationToken cancellationToken)
     {
         const string collection = """
                                   {
@@ -47,7 +47,7 @@ public sealed class PostmanConverterTests : HostedUnitTest
     }
 
     [Test]
-    public async Task Unsupported_methods_fail_instead_of_becoming_get(CancellationToken cancellationToken)
+    public async ValueTask Unsupported_methods_fail_instead_of_becoming_get(CancellationToken cancellationToken)
     {
         const string collection = """
                                   {
