@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <Nullable>enable</Nullable>
         <IsAotCompatible>true</IsAotCompatible>
         <Platforms>AnyCPU</Platforms>
@@ -9,7 +9,7 @@
 
     <PropertyGroup>
         <Description>A utility library that converts Postman schemas to OpenApi</Description>
-        <Version Condition="'$(BUILD_VERSION)' == ''">4.0.0</Version>
+        <Version Condition="'$(BUILD_VERSION)' == ''">11.0.0</Version>
         <Version Condition="'$(BUILD_VERSION)' != ''">$(BUILD_VERSION)</Version>
         <AssemblyName>Soenneker.Postman.Converter</AssemblyName>
         <PackageId>Soenneker.Postman.Converter</PackageId>
@@ -45,6 +45,6 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.OpenApi" Version="3.11.0" />
         <PackageReference Include="Soenneker.Utils.HttpClientCache" Version="4.0.2128" />
-        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2319" />
+        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2320" />
     </ItemGroup>
 </Project>
