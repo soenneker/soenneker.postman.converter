@@ -44,7 +44,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.OpenApi" Version="3.11.0" />
+        <PackageReference Include="Microsoft.OpenApi" Version="3.11.1" />
         <PackageReference Include="Soenneker.Utils.HttpClientCache" Version="11.0.2156" />
         <PackageReference Include="Soenneker.Utils.File" Version="11.0.2344" />
     </ItemGroup>
